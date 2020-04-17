@@ -1,0 +1,1 @@
+ssh sistemas@192.168.150.28 'cd ~/void && ~/.cargo/bin/cargo test'
