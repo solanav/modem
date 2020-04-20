@@ -1,13 +1,19 @@
 /// Functions for communication with the modem
 mod comm;
 
+/// Specific errors for the crate
+mod error;
+
 #[cfg(test)]
 mod tests {
     use crate::comm::Modem;
-    use std::path::Path;
 
     #[test]
-    fn it_works() {
-        let modem = Modem::new(Path::new("/dev/ttyACM0"));
+    fn test_connection() {
+        let mut modem = Modem::new("/dev/ttyACM0");
+        match modem.check_connection() {
+            Ok(_) => println!("Modem connected OK"),
+            Err(e) => println!("Failed to connect to modem: {}", e),
+        }
     }
 }
