@@ -1,7 +1,8 @@
 use crate::error::Error;
-use serial::prelude::*;
 use serial::SerialPort;
 use std::time::Duration;
+use crate::error::Error::CheckConnection;
+use crate::comm::State::Connected;
 
 /// Different states the modem can be in
 pub enum State {
@@ -11,20 +12,15 @@ pub enum State {
 
 /// Mantains data about a modem connection
 pub struct Modem {
-    port: Box<SerialPort>,
+    port: Box<dyn SerialPort>,
     state: State,
 }
 
 impl Modem {
     pub fn new(location: &'static str) -> Self {
-        Modem {
-            port: Box::new(serial::open(location).unwrap()),
-            state: State::Disconnected,
-        }
-    }
+        let mut port = serial::open(location).unwrap();
 
-    pub fn check_connection(&mut self) -> Result<(), Error> {
-        self.port.reconfigure(&|settings| {
+        port.reconfigure(&|settings| {
             settings.set_baud_rate(serial::Baud9600).unwrap();
             settings.set_char_size(serial::Bits8);
             settings.set_parity(serial::ParityNone);
@@ -33,19 +29,34 @@ impl Modem {
             Ok(())
         }).unwrap();
 
-        self.port.set_timeout(Duration::from_millis(1000));
+        port.set_timeout(Duration::from_millis(20000));
 
+        Modem {
+            port: Box::new(port),
+            state: State::Disconnected,
+        }
+    }
+
+    pub fn check_connection(&mut self) -> Result<(), Error> {
         self.port.write("AT\r\n".as_bytes()).unwrap();
 
-        let mut buf: Vec<u8> = vec![0; 5];
-        self.port.read(&mut buf).unwrap();
+        let mut buf = String::new();
+        self.port.read_to_string(&mut buf).unwrap();
 
-        match buf {
-
+        if buf == "\r\nOK\r".to_string() {
+            return Ok(())
         }
 
-        println!("port > [{}]", String::from_utf8(buf).unwrap());
+        Err(CheckConnection())
+    }
 
-        Ok(())
+    pub fn get_manufacturer(&mut self) -> Result<(), Error> {
+        self.port.write("AT+CGMI\r\n".as_bytes()).unwrap();
+
+        let mut buf= String::new();
+        self.port.read_to_string(&mut buf).unwrap();
+        println!("[{}]", buf);
+
+        Err(CheckConnection())
     }
 }
